@@ -30,17 +30,52 @@ def bakeries():
     )
     return response
 
-@app.route('/bakeries/<int:id>')
+@app.route('/baked_goods', methods=['GET','POST'])
+def baked_goods():
+    if request.method == 'GET':
+        goods = BakedGood.query.all()
+        serialized_goods = [good.to_dict() for good in goods]
+        response = make_response(jsonify(serialized_goods), 200)
+        return response
+    
+    elif request.method == 'POST':
+        new_good = BakedGood(
+            name=request.get_json()['name'],
+            price=request.get_json()['price'],
+            bakery_id=request.get_json()['bakery_id']
+        )
+        if new_good:
+            db.session.add(new_good)
+            db.session.commit()
+
+            good_dict = new_good.to_dict()
+            response = make_response(jsonify(good_dict), 201)
+            return response
+    return make_response('Validation Error', 422)
+
+@app.route('/bakeries/<int:id>', methods=['GET', 'PATCH'])
 def bakery_by_id(id):
-
     bakery = Bakery.query.filter_by(id=id).first()
-    bakery_serialized = bakery.to_dict()
+    if bakery:
+        if request.method == 'GET':
+            bakery_serialized = bakery.to_dict()
 
-    response = make_response(
-        bakery_serialized,
-        200
-    )
-    return response
+            response = make_response(
+                bakery_serialized,
+                200
+            )
+            return response
+        
+        elif request.method == 'PATCH':
+            for attr in request.get_json():
+                setattr(bakery, attr, request.get_json()[attr])
+            db.session.add(bakery)
+            db.session.commit()
+
+            bakery_dict = bakery.to_dict()
+            response = make_response(jsonify(bakery_dict), 200)
+            return response
+    return make_response('Bakery not found', 404)
 
 @app.route('/baked_goods/by_price')
 def baked_goods_by_price():
@@ -66,5 +101,16 @@ def most_expensive_baked_good():
     )
     return response
 
+@app.route('/baked_goods/<int:id>', methods=['DELETE'])
+def delete_good(id):
+    good = BakedGood.query.filter(BakedGood.id == id).first()
+
+    if good:
+        if request.method == 'DELETE':
+            db.session.delete(good)
+            db.session.commit()
+            response = make_response('', 204)
+            return response
+        
 if __name__ == '__main__':
     app.run(port=5555, debug=True)
